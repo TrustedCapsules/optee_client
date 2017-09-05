@@ -52,7 +52,7 @@
  * Open a file
  *
  * [in]     param[0].u.value.a	OPTEE_MRF_OPEN
- * [in]     param[1].u.tmem	a string holding the file name
+ * [in]     param[1].u.tmem	a   string holding the file name
  * [out]    param[2].u.value.a	file descriptor of open file
  */
 #define OPTEE_MRF_OPEN			0
@@ -61,7 +61,7 @@
  * Create a file
  *
  * [in]     param[0].u.value.a	OPTEE_MRF_CREATE
- * [in]     param[1].u.tmem	a string holding the file name
+ * [in]     param[1].u.tmem	a   string holding the file name
  * [out]    param[2].u.value.a	file descriptor of open file
  */
 #define OPTEE_MRF_CREATE		1
@@ -80,7 +80,7 @@
  * [in]     param[0].u.value.a	OPTEE_MRF_READ
  * [in]     param[0].u.value.b	file descriptor of open file
  * [in]     param[0].u.value.c	offset into file
- * [out]    param[1].u.tmem	buffer to hold returned data
+ * [out]    param[1].u.tmem 	buffer to hold returned data
  */
 #define OPTEE_MRF_READ			3
 
@@ -90,7 +90,7 @@
  * [in]     param[0].u.value.a	OPTEE_MRF_WRITE
  * [in]     param[0].u.value.b	file descriptor of open file
  * [in]     param[0].u.value.c	offset into file
- * [in]     param[1].u.tmem	buffer holding data to be written
+ * [in]     param[1].u.tmem	    buffer holding data to be written
  */
 #define OPTEE_MRF_WRITE			4
 
@@ -147,6 +147,44 @@
  * [out] param[1].u.tmem	a string holding the file name
  */
 #define OPTEE_MRF_READDIR		10
+
+/*
+ * Seek to a position in the file
+ *
+ * [in]  param[0].u.value.a OPTEE_MRF_SEEK
+ * [in]  param[1].u.value.a handle to open file
+ * [in]  param[1].u.value.b offset into the file
+ * [in]  param[1].u.value.c flags (whence)
+ * [out] param[2].u.value.a number of bytes offset moved
+ */
+#define OPTEE_MRF_LSEEK         11
+
+/*
+ * Unlink a file
+ *
+ * [in] param[0].u.value.a  OPTEE_MRF_UNLINK
+ * [in] param[1].u.tmem     a string holding the file name
+ */
+#define OPTEE_MRF_UNLINK        12
+
+/*
+ * Writes to a file descriptor and returns the number of bytes written
+ *
+ * [in]  param[0].u.value.a OPTEE_MRF_SIMPLE_WRITE
+ * [in]  param[0].u.value.b file descriptor
+ * [in]  param[1].u.tmem    a string holding the data to write
+ * [out] param[2].u.value.a number of bytes written
+ */
+#define OPTEE_MRF_SIMPLE_WRITE  13
+
+/*
+ * Writes to a file descriptor and returns the number of bytes read
+ *
+ * [in]  param[0].u.value.a OPTEE_MRF_SIMPLE_WRITE
+ * [in]  param[0].u.value.b file descriptor
+ * [out] param[1].u.tmem    a buffer to put the read data in
+ */
+#define OPTEE_MRF_SIMPLE_READ   14
 
 /*
  * End of definitions for messages with .cmd == OPTEE_MSG_RPC_CMD_FS
@@ -252,6 +290,61 @@
 
 /*
  * End of definitions for messages with .cmd == OPTEE_MSG_RPC_CMD_SOCKET
+ */
+
+/*
+ * Network commands
+ */
+#define OPTEE_MSG_RPC_CMD_NETWORK	11
+
+/*
+ * Define protocol for messages with .cmd == OPTEE_MSG_RPC_CMD_NETWORK
+ */
+
+/*
+ * Opens a TCP socket connection for TEE
+ *
+ * [in]  param[0].u.value.a OPTEE_MRC_NETWORK_OPEN
+ * [in]  param[1].u.value.a port
+ * [in]  param[1].u.value.b TEE_ISOCKET_PROTOCOLID_TCP
+ * [in]  param[1].u.value.c TEE_IP_VERSION_4
+ * [in]  param[2].u.tmem    server ip address
+ * [out] param[3].u.value.a file descriptor for the socket
+ */
+#define OPTEE_MRC_NETWORK_OPEN  1
+
+/*
+ * Closes a TCP socket connection for TEE
+ *
+ * [in]  param[0].u.value.a OPTEE_MRC_NETWORK_CLOSE
+ * [in]  param[0].u.value.b file descriptor of the socket
+ */
+#define OPTEE_MRC_NETWORK_CLOSE 2
+
+/*
+ * Sends a message on a specified TCP socket for TEE
+ *
+ * [in]  param[0].u.value.a OPTEE_MRC_NETWORK_SEND
+ * [in]  param[0].u.value.b file descriptor of the socket
+ * [in]  param[1].u.tmem    buffer of data to send
+ * [in]  param[2].u.value.a timeout for the send
+ * [out] param[2].u.value.b number of bytes transmitted
+ */
+#define OPTEE_MRC_NETWORK_SEND  3
+
+/*
+ * Receives a message on a specified TCP socket for TEE
+ *
+ * [in]  param[0].u.value.a OPTEE_MRC_NETWORK_RECV
+ * [in]  param[0].u.value.b file descriptbor of the socket
+ * [in]  param[0].u.value.c timeout for the receive
+ * [out] param[1].u.tmem    buffer to store received data
+ * [out] param[2].u.value.a number of received bytes
+ */
+#define OPTEE_MRC_NETWORK_RECV  4
+
+/*
+ * End of definitions for messages with .cmd == OPTEE_MSG_RPC_CMD_NETWORK
  */
 
 #endif /*__OPTEE_MSG_SUPPLICANT_H*/

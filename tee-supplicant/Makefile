@@ -17,6 +17,7 @@ PACKAGE_NAME	:= tee-supplicant
 TEES_SRCS	:= tee_supplicant.c \
 		   teec_ta_load.c \
 		   tee_supp_fs.c \
+		   tee_supp_network.c \
 		   rpmb.c \
 		   handle.c
 

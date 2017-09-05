@@ -50,6 +50,7 @@
 #include <teec_trace.h>
 #include <tee_socket.h>
 #include <tee_supp_fs.h>
+#include <tee_supp_network.h>
 #include <tee_supplicant.h>
 #include <unistd.h>
 
@@ -506,7 +507,6 @@ static bool process_one_request(struct thread_arg *arg)
 	uint32_t func;
 	uint32_t ret;
 
-	DMSG("looping");
 	memset(&request, 0, sizeof(request));
 	request.recv.num_params = RPC_NUM_PARAMS;
 
@@ -532,7 +532,10 @@ static bool process_one_request(struct thread_arg *arg)
 	case OPTEE_MSG_RPC_CMD_FS:
 		ret = tee_supp_fs_process(num_params, params);
 		break;
-	case OPTEE_MSG_RPC_CMD_RPMB:
+    case OPTEE_MSG_RPC_CMD_NETWORK:
+        ret = tee_supp_network_process(num_params, params); // copies socket process, but doesn't use the handles. TODO: change to use socket process
+        break;
+    case OPTEE_MSG_RPC_CMD_RPMB:
 		ret = process_rpmb(num_params, params);
 		break;
 	case OPTEE_MSG_RPC_CMD_SHM_ALLOC:

@@ -147,6 +147,7 @@ static TEEC_Result ree_fs_new_open(size_t num_params,
 	char *fname;
 	int fd;
 
+    DMSG("In ree_fs_new_open, supplicant");
 	if (num_params != 3 ||
 	    (params[0].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
 			TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT ||
@@ -160,19 +161,28 @@ static TEEC_Result ree_fs_new_open(size_t num_params,
 	if (!fname)
 		return TEEC_ERROR_BAD_PARAMETERS;
 
-	if (!tee_fs_get_absolute_filename(fname, abs_filename,
-					  sizeof(abs_filename)))
-		return TEEC_ERROR_BAD_PARAMETERS;
+    if (strstr(fname, "capsule") == NULL) {
+	    if (!tee_fs_get_absolute_filename(fname, abs_filename,
+		    			  sizeof(abs_filename)))
+    		return TEEC_ERROR_BAD_PARAMETERS;
+    } else {
+        // TODO: double check for buffer overflow, or just reset abs_filename, copying might not be best.
+        strcpy(abs_filename, fname);
+    }
 
+    DMSG("Calling open_wrapper with %s", abs_filename);
 	fd = open_wrapper(abs_filename, O_RDWR);
 	if (fd < 0) {
 		/*
 		 * In case the problem is the filesystem is RO, retry with the
 		 * open flags restricted to RO.
 		 */
+        DMSG("Call failed, retrying with read only on %s", abs_filename);
 		fd = open_wrapper(abs_filename, O_RDONLY);
-		if (fd < 0)
+		if (fd < 0) {
+            DMSG("Call still failed, erroring");
 			return TEEC_ERROR_ITEM_NOT_FOUND;
+        }
 	}
 
 	params[2].u.value.a = fd;
@@ -602,6 +612,136 @@ static TEEC_Result ree_fs_new_readdir(size_t num_params,
 	return TEEC_SUCCESS;
 }
 
+static TEEC_Result ree_fs_simple_lseek(size_t num_params, struct tee_ioctl_param *params) {
+    off_t offs;
+    int fd;
+    int whence;
+    off_t res;
+
+    if (num_params != 2 ||
+            (params[0].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT ||
+            (params[1].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT)
+        return TEEC_ERROR_BAD_PARAMETERS;
+
+    fd = params[1].u.value.a;
+    offs = params[1].u.value.b;
+    whence = params[1].u.value.c;
+
+    DMSG( "Calling lseek with fd: %d, offs: %ld, whence: %d", fd, offs, whence );
+    res = lseek(fd, offs, whence);
+    if (res == -1) {
+        return TEEC_ERROR_GENERIC;
+    }
+
+    return TEEC_SUCCESS;
+}
+
+static TEEC_Result ree_fs_simple_unlink(size_t num_params, struct tee_ioctl_param *params) {
+    char abs_filename[PATH_MAX];
+    char *fname;
+
+    if (num_params != 2 ||
+            (params[0].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT ||
+            (params[1].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT)
+        return TEEC_ERROR_BAD_PARAMETERS;
+
+    fname = tee_supp_param_to_va(params + 1);
+    if (!fname)
+        return TEEC_ERROR_BAD_PARAMETERS;
+
+    if (!tee_fs_get_absolute_filename(fname, abs_filename,
+                sizeof(abs_filename)))
+        return TEEC_ERROR_BAD_PARAMETERS;
+
+    if (unlink(abs_filename)) {
+        if (errno == ENOENT)
+            return TEEC_ERROR_ITEM_NOT_FOUND;
+        return TEEC_ERROR_GENERIC;
+    }
+
+    return TEEC_SUCCESS;
+}
+
+static TEEC_Result ree_fs_simple_read(size_t num_params,
+        struct tee_ioctl_param *params)
+{
+    uint8_t *buf;
+    size_t len;
+    int fd;
+    ssize_t r;
+
+    if (num_params != 2 ||
+            (params[0].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT ||
+            (params[1].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT)
+        return TEEC_ERROR_BAD_PARAMETERS;
+
+    fd = params[0].u.value.b;
+
+    buf = tee_supp_param_to_va(params + 1);
+    if (!buf)
+        return TEEC_ERROR_BAD_PARAMETERS;
+    len = params[1].u.memref.size;
+
+    r = read(fd, buf, len);
+    if (r < 0) {
+        return TEEC_ERROR_GENERIC;
+    }
+
+    params[1].u.memref.size = r;
+    return TEEC_SUCCESS;
+}
+
+static TEEC_Result ree_fs_simple_write(size_t num_params,
+        struct tee_ioctl_param *params)
+{
+    uint8_t *buf;
+    size_t len;
+    int fd;
+    ssize_t r;
+    int written = 0;
+
+    if (num_params != 3 ||
+            (params[0].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT ||
+            (params[1].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT || 
+            (params[2].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT)
+        return TEEC_ERROR_BAD_PARAMETERS;
+
+    fd = params[0].u.value.b;
+
+    buf = tee_supp_param_to_va(params + 1);
+    if (!buf)
+        return TEEC_ERROR_BAD_PARAMETERS;
+    len = params[1].u.memref.size;
+
+    while (len) {
+        r = write(fd, buf, len);
+        if (r < 0) {
+            if (errno == EINTR)
+                continue;
+            return TEEC_ERROR_GENERIC;
+        } else if (r == 0) {
+            break; // Break out if writing nothing
+        }
+        assert((size_t)r <= len);
+        buf += r;
+        len -= r;
+        written += r;
+    }
+
+    params[2].u.value.a = written;
+
+    return TEEC_SUCCESS;
+}
+
 TEEC_Result tee_supp_fs_process(size_t num_params,
 				struct tee_ioctl_param *params)
 {
@@ -610,6 +750,7 @@ TEEC_Result tee_supp_fs_process(size_t num_params,
 
 	switch (params->u.value.a) {
 	case OPTEE_MRF_OPEN:
+        DMSG("OPTEE_MRF_OPEN");
 		return ree_fs_new_open(num_params, params);
 	case OPTEE_MRF_CREATE:
 		return ree_fs_new_create(num_params, params);
@@ -631,7 +772,15 @@ TEEC_Result tee_supp_fs_process(size_t num_params,
 		return ree_fs_new_closedir(num_params, params);
 	case OPTEE_MRF_READDIR:
 		return ree_fs_new_readdir(num_params, params);
-	default:
+    case OPTEE_MRF_LSEEK:
+        return ree_fs_simple_lseek(num_params, params);
+    case OPTEE_MRF_UNLINK:
+        return ree_fs_simple_unlink(num_params, params);
+    case OPTEE_MRF_SIMPLE_WRITE:
+        return ree_fs_simple_write(num_params, params);
+    case OPTEE_MRF_SIMPLE_READ:
+        return ree_fs_simple_read(num_params, params);
+    default:
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 }
