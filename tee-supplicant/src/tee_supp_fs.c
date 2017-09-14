@@ -68,7 +68,13 @@ static size_t tee_fs_get_absolute_filename(char *file, char *out,
 	if (!file || !out || (out_size <= strlen(tee_fs_root) + 1))
 		return 0;
 
-	s = snprintf(out, out_size, "%s%s", tee_fs_root, file);
+    // TODO: make more elegant.
+    if (strstr(file, "capsule") == NULL) {
+	    s = snprintf(out, out_size, "%s%s", tee_fs_root, file);
+    } else {
+        s = snprintf(out, out_size, "%s", file);
+    }
+
 	if (s < 0 || (size_t)s >= out_size)
 		return 0;
 
@@ -161,14 +167,9 @@ static TEEC_Result ree_fs_new_open(size_t num_params,
 	if (!fname)
 		return TEEC_ERROR_BAD_PARAMETERS;
 
-    if (strstr(fname, "capsule") == NULL) {
-	    if (!tee_fs_get_absolute_filename(fname, abs_filename,
-		    			  sizeof(abs_filename)))
-    		return TEEC_ERROR_BAD_PARAMETERS;
-    } else {
-        // TODO: double check for buffer overflow, or just reset abs_filename, copying might not be best.
-        strcpy(abs_filename, fname);
-    }
+    if (!tee_fs_get_absolute_filename(fname, abs_filename,
+	    sizeof(abs_filename)))
+    	return TEEC_ERROR_BAD_PARAMETERS;
 
     DMSG("Calling open_wrapper with %s", abs_filename);
 	fd = open_wrapper(abs_filename, O_RDWR);
@@ -618,11 +619,13 @@ static TEEC_Result ree_fs_simple_lseek(size_t num_params, struct tee_ioctl_param
     int whence;
     off_t res;
 
-    if (num_params != 2 ||
+    if (num_params != 3 ||
             (params[0].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
             TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT ||
             (params[1].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
-            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT)
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT ||
+            (params[2].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
+            TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT)
         return TEEC_ERROR_BAD_PARAMETERS;
 
     fd = params[1].u.value.a;
@@ -635,6 +638,7 @@ static TEEC_Result ree_fs_simple_lseek(size_t num_params, struct tee_ioctl_param
         return TEEC_ERROR_GENERIC;
     }
 
+    DMSG( "fd %d now at offset %ld", fd, res);
     return TEEC_SUCCESS;
 }
 
