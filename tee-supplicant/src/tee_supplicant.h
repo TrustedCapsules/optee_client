@@ -31,6 +31,9 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+extern struct benchmarking_supp supp_b;
+unsigned long long read_cntpct(void);
+
 struct tee_ioctl_param;
 
 bool tee_supp_param_is_memref(struct tee_ioctl_param *param);
