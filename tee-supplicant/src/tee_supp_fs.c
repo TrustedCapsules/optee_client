@@ -173,6 +173,7 @@ static TEEC_Result ree_fs_new_open(size_t num_params,
 
     DMSG("Calling open_wrapper with %s", abs_filename);
 	fd = open_wrapper(abs_filename, O_RDWR);
+    DMSG("Open wrapper returned with %d", fd);
 	if (fd < 0) {
 		/*
 		 * In case the problem is the filesystem is RO, retry with the
