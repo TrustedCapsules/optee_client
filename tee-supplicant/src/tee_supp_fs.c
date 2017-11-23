@@ -678,6 +678,7 @@ static TEEC_Result ree_fs_simple_read(size_t num_params,
     size_t len;
     int fd;
     ssize_t r;
+    off_t offset;
 
     if (num_params != 2 ||
             (params[0].attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) !=
@@ -687,13 +688,15 @@ static TEEC_Result ree_fs_simple_read(size_t num_params,
         return TEEC_ERROR_BAD_PARAMETERS;
 
     fd = params[0].u.value.b;
+    offset = params[0].u.value.c;
 
     buf = tee_supp_param_to_va(params + 1);
     if (!buf)
         return TEEC_ERROR_BAD_PARAMETERS;
     len = params[1].u.memref.size;
 
-    r = read(fd, buf, len);
+    // TODO: test what happens if you hardcode an lseek in here with whence = SEEK_SET
+    r = pread(fd, buf, len, offset);
     if (r < 0) {
         return TEEC_ERROR_GENERIC;
     }
@@ -709,6 +712,7 @@ static TEEC_Result ree_fs_simple_write(size_t num_params,
     size_t len;
     int fd;
     ssize_t r;
+    off_t offset;
     int written = 0;
 
     if (num_params != 3 ||
@@ -721,6 +725,7 @@ static TEEC_Result ree_fs_simple_write(size_t num_params,
         return TEEC_ERROR_BAD_PARAMETERS;
 
     fd = params[0].u.value.b;
+    offset = params[0].u.value.c;
 
     buf = tee_supp_param_to_va(params + 1);
     if (!buf)
@@ -728,7 +733,8 @@ static TEEC_Result ree_fs_simple_write(size_t num_params,
     len = params[1].u.memref.size;
 
     while (len) {
-        r = write(fd, buf, len);
+        // TODO: test using lseek right before the write call, then just doing a write in a loop
+        r = pwrite(fd, buf, len, offset);
         if (r < 0) {
             if (errno == EINTR)
                 continue;
@@ -740,6 +746,7 @@ static TEEC_Result ree_fs_simple_write(size_t num_params,
         buf += r;
         len -= r;
         written += r;
+        offset += r; // update offset for sequential write
     }
 
     params[2].u.value.a = written;
